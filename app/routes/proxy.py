@@ -4,9 +4,9 @@ from typing import Annotated
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from app.auth.jwt import get_current_claims
+from app.auth.jwt import verify_auth
 from app.config import Settings, get_settings
-from app.proxy.client import HOP_BY_HOP, ProxyClient
+from app.proxy.client import GATEWAY_CONTROLLED_HEADERS, HOP_BY_HOP, ProxyClient
 
 logger = logging.getLogger("gateway")
 
@@ -44,20 +44,33 @@ def _resolve_upstream(path: str, settings: Settings) -> str:
 async def proxy(
     path: str,
     request: Request,
-    claims: Annotated[dict, Depends(get_current_claims)],
+    claims: Annotated[dict | None, Depends(verify_auth)],
     settings: Annotated[Settings, Depends(get_settings)],
     client: Annotated[ProxyClient, Depends(_get_proxy_client)],
 ) -> Response:
     upstream_url = _resolve_upstream(f"/{path}", settings)
 
     forward_headers = {
-        k: v for k, v in request.headers.items() if k.lower() not in HOP_BY_HOP
+        k: v
+        for k, v in request.headers.items()
+        if k.lower() not in HOP_BY_HOP and k.lower() not in GATEWAY_CONTROLLED_HEADERS
     }
-    # Propagate verified identity to downstream services
-    forward_headers["X-User-ID"] = str(claims.get("sub", ""))
+    # Propagate verified identity to downstream services (absent on public routes)
+    if claims:
+        forward_headers["X-User-ID"] = str(claims.get("sub", ""))
     forward_headers["X-Request-ID"] = getattr(request.state, "request_id", "")
 
     body = await request.body()
+
+    if f"/{path}".startswith("/auth"):
+        logger.info(
+            "upstream_auth_call",
+            extra={
+                "request_id": getattr(request.state, "request_id", None),
+                "method": request.method,
+                "upstream_url": upstream_url,
+            },
+        )
 
     try:
         upstream = await client.forward(
@@ -79,7 +92,7 @@ async def proxy(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Upstream service unavailable",
         ) from exc
-
+    # logger.info("upstream_response", extra={"url": upstream_url, "status_code": upstream.status_code})
     return Response(
         content=upstream.content,
         status_code=upstream.status_code,

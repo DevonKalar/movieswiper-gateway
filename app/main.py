@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
@@ -15,6 +15,22 @@ from app.routes.health import router as health_router
 from app.routes.proxy import router as proxy_router
 
 logger = logging.getLogger("gateway")
+
+
+async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    logger.warning(
+        "rate_limit_exceeded",
+        extra={
+            "request_id": getattr(request.state, "request_id", None),
+            "path": request.url.path,
+            "client_ip": request.client.host if request.client else None,
+            "limit": str(exc.limit),
+        },
+    )
+    return JSONResponse(
+        status_code=429,
+        content={"detail": f"Rate limit exceeded: {exc.limit}"},
+    )
 
 
 async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:

@@ -18,6 +18,7 @@ from app.proxy.client import ProxyClient  # noqa: E402
 TEST_JWT_SECRET = "test-secret"
 TEST_MOVIES_URL = "http://movies-service"
 TEST_USERS_URL = "http://users-service"
+TEST_AUTH_URL = "http://auth-service"
 
 
 @pytest.fixture
@@ -25,7 +26,7 @@ def test_settings() -> Settings:
     """Deterministic settings for every test — no env var parsing required."""
     return Settings(
         jwt_secret=TEST_JWT_SECRET,
-        services={"movies": TEST_MOVIES_URL, "users": TEST_USERS_URL},
+        services={"movies": TEST_MOVIES_URL, "users": TEST_USERS_URL, "auth": TEST_AUTH_URL},
     )
 
 

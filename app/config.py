@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     # Set via env vars like: SERVICES__movies=http://movies-service:8000
     services: dict[str, str] = {}
 
+    # Paths that bypass JWT validation (prefix-matched)
+    public_paths: list[str] = ["/auth/login", "/auth/register", "/auth/refresh", "/recommendations"]
+
 
 @lru_cache
 def get_settings() -> Settings:

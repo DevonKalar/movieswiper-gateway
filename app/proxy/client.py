@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 from tenacity import (
     retry,
@@ -5,6 +7,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
+logger = logging.getLogger("gateway")
 
 from app.config import Settings
 
@@ -22,6 +26,10 @@ HOP_BY_HOP = frozenset(
         "host",
     }
 )
+
+# Headers set by this gateway from verified state; strip any client-supplied values
+# to prevent spoofing (e.g. a client injecting X-User-ID to impersonate another user)
+GATEWAY_CONTROLLED_HEADERS = frozenset({"x-user-id"})
 
 _RETRYABLE = (httpx.TimeoutException, httpx.ConnectError)
 
@@ -43,6 +51,16 @@ class ProxyClient:
         content: bytes,
         params: dict[str, str],
     ) -> httpx.Response:
+        def _before_sleep(retry_state) -> None:
+            logger.warning(
+                "upstream_retry",
+                extra={
+                    "url": url,
+                    "attempt": retry_state.attempt_number,
+                    "error": str(retry_state.outcome.exception()),
+                },
+            )
+
         @retry(
             retry=retry_if_exception_type(_RETRYABLE),
             stop=stop_after_attempt(self._settings.downstream_max_retries),
@@ -51,6 +69,7 @@ class ProxyClient:
                 min=0.1,
                 max=5.0,
             ),
+            before_sleep=_before_sleep,
             reraise=True,
         )
         async def _send() -> httpx.Response:
