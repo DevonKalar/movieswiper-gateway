@@ -3,6 +3,10 @@ import os
 # Provide JWT_SECRET before app modules are imported so the module-level
 # `app = create_app()` in main.py does not raise a validation error.
 os.environ.setdefault("JWT_SECRET", "test-secret")
+# Allow any origin in tests — .env may restrict CORS_ORIGINS to specific hosts,
+# but middleware is configured at create_app() time using the real settings,
+# not the fixture's test_settings (which only affects route-level dependencies).
+os.environ.setdefault("CORS_ORIGINS", '["*"]')
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402
@@ -66,7 +70,12 @@ async def client(test_settings: Settings, mock_proxy_client: AsyncMock) -> Async
     - The real ProxyClient created during lifespan is replaced with
       mock_proxy_client so no outbound HTTP calls are made.
     """
+    # Clear cache so create_app() picks up the env vars set at module level
+    # (e.g. CORS_ORIGINS) rather than a stale cache from the module-level
+    # `app = create_app()` call in main.py that ran before our env vars were set.
+    get_settings.cache_clear()
     app = create_app()
+    get_settings.cache_clear()  # restore clean state for subsequent calls
     app.dependency_overrides[get_settings] = lambda: test_settings
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
