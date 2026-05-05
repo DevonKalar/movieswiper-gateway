@@ -31,7 +31,7 @@ HOP_BY_HOP = frozenset(
 # to prevent spoofing (e.g. a client injecting X-User-ID to impersonate another user)
 GATEWAY_CONTROLLED_HEADERS = frozenset({"x-user-id"})
 
-_RETRYABLE = (httpx.TimeoutException, httpx.ConnectError)
+_RETRYABLE = (httpx.TimeoutException,)
 
 
 class ProxyClient:
