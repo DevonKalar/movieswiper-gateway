@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     services: dict[str, str] = {}
 
     # Paths that bypass JWT validation (prefix-matched)
-    public_paths: list[str] = ["/auth/login", "/auth/register", "/auth/refresh", "/recommendations"]
+    public_paths: list[str] = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/guest", "/recommendations"]
 
 
 @lru_cache

@@ -62,14 +62,14 @@ async def test_token_without_sub_returns_401(client, make_token):
 # Public routes
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("path", ["/auth/login", "/auth/register", "/auth/refresh"])
+@pytest.mark.parametrize("path", ["/auth/login", "/auth/register", "/auth/refresh", "/auth/guest"])
 async def test_public_route_requires_no_token(client, path):
     response = await client.post(path, json={})
 
     assert response.status_code == 200
 
 
-@pytest.mark.parametrize("path", ["/auth/login", "/auth/register", "/auth/refresh"])
+@pytest.mark.parametrize("path", ["/auth/login", "/auth/register", "/auth/refresh", "/auth/guest"])
 async def test_public_route_does_not_forward_x_user_id(client, mock_proxy_client, path):
     await client.post(path, json={})
 
